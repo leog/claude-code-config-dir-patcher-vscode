@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "leog",
   "license": "MIT",
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#D96A43",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/leog/claude-code-config-dir-patcher-vscode.git"

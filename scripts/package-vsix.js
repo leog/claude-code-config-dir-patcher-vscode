@@ -25,7 +25,7 @@ function xmlEscape(value) {
 }
 
 fs.mkdirSync(extensionDir, { recursive: true });
-for (const file of ["package.json", "extension.js", "README.md"]) {
+for (const file of ["package.json", "extension.js", "README.md", "assets/icon.png"]) {
   copyFile(file);
 }
 
@@ -36,6 +36,7 @@ fs.writeFileSync(
   <Default Extension="json" ContentType="application/json" />
   <Default Extension="js" ContentType="application/javascript" />
   <Default Extension="md" ContentType="text/markdown" />
+  <Default Extension="png" ContentType="image/png" />
   <Default Extension="vsixmanifest" ContentType="text/xml" />
 </Types>
 `,
