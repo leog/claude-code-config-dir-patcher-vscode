@@ -1,0 +1,55 @@
+{
+  "name": "claude-code-config-dir-patcher",
+  "displayName": "Claude Code Config Dir Patcher",
+  "description": "Patches Anthropic Claude Code for VS Code so claudeCode.environmentVariables CLAUDE_CONFIG_DIR affects extension auth/session storage.",
+  "version": "0.1.0",
+  "publisher": "local-tools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:claudeConfigDirPatcher.apply",
+    "onCommand:claudeConfigDirPatcher.verify",
+    "onCommand:claudeConfigDirPatcher.restore"
+  ],
+  "main": "./extension.js",
+  "scripts": {
+    "package": "node scripts/package-vsix.js"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Claude Code Config Dir Patcher",
+      "properties": {
+        "claudeConfigDirPatcher.autoPatch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically patch the installed Anthropic Claude Code extension on VS Code startup."
+        },
+        "claudeConfigDirPatcher.showStartupNotifications": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a notification when startup auto-patching succeeds or is already applied."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "claudeConfigDirPatcher.apply",
+        "title": "Claude Config Dir Patcher: Apply Patch"
+      },
+      {
+        "command": "claudeConfigDirPatcher.verify",
+        "title": "Claude Config Dir Patcher: Verify Patch"
+      },
+      {
+        "command": "claudeConfigDirPatcher.restore",
+        "title": "Claude Config Dir Patcher: Restore Backup"
+      }
+    ]
+  }
+}
