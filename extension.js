@@ -8,14 +8,14 @@ const BACKUP_SUFFIX = ".claude-config-dir-patcher.bak";
 const ENV_PATCH =
   'if(B.CLAUDE_CONFIG_DIR)process.env.CLAUDE_CONFIG_DIR=B.CLAUDE_CONFIG_DIR;';
 
-const IDE_PATCH =
-  'let V=XI.join(process.env.CLAUDE_CONFIG_DIR||XI.join(l94.homedir(),".claude"),"ide");return';
-
 const ENV_NEEDLE =
   'for(let x of K)if(x.name)B[x.name]=x.value||"";return B.CLAUDE_CODE_ENTRYPOINT=';
 
-const IDE_NEEDLE =
-  'let V=XI.join(l94.homedir(),".claude","ide");return';
+const IDE_NEEDLE_REGEX =
+  /let V=([A-Za-z_$][\w$]*)\.join\(l94\.homedir\(\),"\.claude","ide"\);return/;
+
+const IDE_PATCHED_REGEX =
+  /let V=([A-Za-z_$][\w$]*)\.join\(process\.env\.CLAUDE_CONFIG_DIR\|\|\1\.join\(l94\.homedir\(\),"\.claude"\),"ide"\);return/;
 
 function getConfig() {
   return vscode.workspace.getConfiguration("claudeConfigDirPatcher");
@@ -42,9 +42,15 @@ function analyze(source) {
   return {
     envPatched: source.includes(ENV_PATCH),
     envPatchable: source.includes(ENV_NEEDLE),
-    idePatched: source.includes(IDE_PATCH),
-    idePatchable: source.includes(IDE_NEEDLE),
+    idePatched: IDE_PATCHED_REGEX.test(source),
+    idePatchable: IDE_NEEDLE_REGEX.test(source),
   };
+}
+
+function patchIdePath(source) {
+  return source.replace(IDE_NEEDLE_REGEX, (_match, pathModuleName) => {
+    return `let V=${pathModuleName}.join(process.env.CLAUDE_CONFIG_DIR||${pathModuleName}.join(l94.homedir(),".claude"),"ide");return`;
+  });
 }
 
 function applyPatch() {
@@ -65,7 +71,7 @@ function applyPatch() {
     if (!status.idePatchable) {
       throw new Error("Could not find the hardcoded ~/.claude/ide patch point.");
     }
-    next = next.replace(IDE_NEEDLE, IDE_PATCH);
+    next = patchIdePath(next);
     changes.push("CLAUDE_CONFIG_DIR-aware IDE lock path");
   }
 
