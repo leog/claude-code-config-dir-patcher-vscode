@@ -5,17 +5,18 @@ const vscode = require("vscode");
 const TARGET_EXTENSION_ID = "anthropic.claude-code";
 const BACKUP_SUFFIX = ".claude-config-dir-patcher.bak";
 
-const ENV_PATCH =
-  'if(B.CLAUDE_CONFIG_DIR)process.env.CLAUDE_CONFIG_DIR=B.CLAUDE_CONFIG_DIR;';
+// Captures: 1=loop var, 2=collection var, 3=env-object var.
+const ENV_NEEDLE_REGEX =
+  /for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)if\(\1\.name\)([A-Za-z_$][\w$]*)\[\1\.name\]=\1\.value\|\|"";return \3\.CLAUDE_CODE_ENTRYPOINT=/;
 
-const ENV_NEEDLE =
-  'for(let x of K)if(x.name)B[x.name]=x.value||"";return B.CLAUDE_CODE_ENTRYPOINT=';
+const ENV_PATCHED_REGEX =
+  /if\(([A-Za-z_$][\w$]*)\.CLAUDE_CONFIG_DIR\)process\.env\.CLAUDE_CONFIG_DIR=\1\.CLAUDE_CONFIG_DIR;for\(let ([A-Za-z_$][\w$]*) of [A-Za-z_$][\w$]*\)if\(\2\.name\)\1\[\2\.name\]=\2\.value\|\|"";return \1\.CLAUDE_CODE_ENTRYPOINT=/;
 
 const IDE_NEEDLE_REGEX =
-  /let V=([A-Za-z_$][\w$]*)\.join\(l94\.homedir\(\),"\.claude","ide"\);return/;
+  /let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\.join\(([A-Za-z_$][\w$]*)\.homedir\(\),"\.claude","ide"\);return/;
 
 const IDE_PATCHED_REGEX =
-  /let V=([A-Za-z_$][\w$]*)\.join\(process\.env\.CLAUDE_CONFIG_DIR\|\|\1\.join\(l94\.homedir\(\),"\.claude"\),"ide"\);return/;
+  /let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\.join\(process\.env\.CLAUDE_CONFIG_DIR\|\|\2\.join\(([A-Za-z_$][\w$]*)\.homedir\(\),"\.claude"\),"ide"\);return/;
 
 function getConfig() {
   return vscode.workspace.getConfiguration("claudeConfigDirPatcher");
@@ -40,16 +41,22 @@ function readTarget() {
 
 function analyze(source) {
   return {
-    envPatched: source.includes(ENV_PATCH),
-    envPatchable: source.includes(ENV_NEEDLE),
+    envPatched: ENV_PATCHED_REGEX.test(source),
+    envPatchable: ENV_NEEDLE_REGEX.test(source),
     idePatched: IDE_PATCHED_REGEX.test(source),
     idePatchable: IDE_NEEDLE_REGEX.test(source),
   };
 }
 
+function patchEnv(source) {
+  return source.replace(ENV_NEEDLE_REGEX, (match, _itemName, _collection, envObjName) => {
+    return `if(${envObjName}.CLAUDE_CONFIG_DIR)process.env.CLAUDE_CONFIG_DIR=${envObjName}.CLAUDE_CONFIG_DIR;${match}`;
+  });
+}
+
 function patchIdePath(source) {
-  return source.replace(IDE_NEEDLE_REGEX, (_match, pathModuleName) => {
-    return `let V=${pathModuleName}.join(process.env.CLAUDE_CONFIG_DIR||${pathModuleName}.join(l94.homedir(),".claude"),"ide");return`;
+  return source.replace(IDE_NEEDLE_REGEX, (_match, varName, pathModuleName, osModuleName) => {
+    return `let ${varName}=${pathModuleName}.join(process.env.CLAUDE_CONFIG_DIR||${pathModuleName}.join(${osModuleName}.homedir(),".claude"),"ide");return`;
   });
 }
 
@@ -63,14 +70,14 @@ function applyPatch() {
     if (!status.envPatchable) {
       throw new Error("Could not find the claudeCode.environmentVariables launch-env patch point.");
     }
-    next = next.replace(ENV_NEEDLE, `${ENV_PATCH}${ENV_NEEDLE}`);
+    next = patchEnv(next);
     changes.push("extension process CLAUDE_CONFIG_DIR propagation");
   }
 
-  if (!status.idePatched) {
-    if (!status.idePatchable) {
-      throw new Error("Could not find the hardcoded ~/.claude/ide patch point.");
-    }
+  // Newer Claude Code builds route the IDE lock path through a CLAUDE_CONFIG_DIR-aware
+  // helper, so the hardcoded needle is absent. Only patch when the unpatched form is
+  // actually present; otherwise treat IDE-side handling as upstream-provided.
+  if (!status.idePatched && status.idePatchable) {
     next = patchIdePath(next);
     changes.push("CLAUDE_CONFIG_DIR-aware IDE lock path");
   }
@@ -91,7 +98,8 @@ function applyPatch() {
 function verifyPatch() {
   const { filePath, source } = readTarget();
   const status = analyze(source);
-  return { filePath, status, ok: status.envPatched && status.idePatched };
+  const ideOk = status.idePatched || !status.idePatchable;
+  return { filePath, status, ok: status.envPatched && ideOk };
 }
 
 function restoreBackup() {
@@ -131,7 +139,7 @@ async function verifyAndReport() {
   const detail = [
     `File: ${result.filePath}`,
     `environmentVariables propagation: ${result.status.envPatched ? "patched" : result.status.envPatchable ? "patchable" : "not found"}`,
-    `IDE path: ${result.status.idePatched ? "patched" : result.status.idePatchable ? "patchable" : "not found"}`,
+    `IDE path: ${result.status.idePatched ? "patched" : result.status.idePatchable ? "patchable" : "handled upstream"}`,
   ].join("\n");
 
   if (result.ok) {
