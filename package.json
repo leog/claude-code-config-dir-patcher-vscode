@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Config Dir Patcher",
   "description": "Patches Anthropic Claude Code for VS Code so claudeCode.environmentVariables CLAUDE_CONFIG_DIR affects extension auth/session storage.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "leog",
   "license": "MIT",
   "icon": "assets/icon.png",
