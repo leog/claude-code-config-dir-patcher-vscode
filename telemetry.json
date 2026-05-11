@@ -86,5 +86,81 @@
       "comment": "Boolean patch-point analysis for environmentVariables propagation and IDE path handling.",
       "endPoint": "Sentry"
     }
+  },
+  "claudeConfigDirPatcher.extensionInstalled": {
+    "owner": "leog",
+    "comment": "Sent once on first activation when VS Code telemetry is enabled and this extension's analytics setting is enabled. This is a proxy for successful installation because VS Code extensions cannot observe marketplace install completion directly.",
+    "analytics_event": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The Sentry event name, extension.installed.",
+      "endPoint": "Sentry"
+    },
+    "extension_name": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The extension package name.",
+      "endPoint": "Sentry"
+    },
+    "extension_version": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The installed version of this extension.",
+      "endPoint": "Sentry"
+    },
+    "installed_version": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The installed version of this extension, duplicated as a stable distribution tag.",
+      "endPoint": "Sentry"
+    },
+    "release": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The extension package name and version.",
+      "endPoint": "Sentry"
+    },
+    "environment": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Whether the extension is running in production, development, or test mode.",
+      "endPoint": "Sentry"
+    },
+    "vscode_ui_kind": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Whether VS Code is running on desktop or web.",
+      "endPoint": "Sentry"
+    },
+    "vscode_remote_name": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The VS Code remote kind, or none when not connected to a remote extension host.",
+      "endPoint": "Sentry"
+    },
+    "runtime": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "VS Code and Node.js version metadata.",
+      "endPoint": "Sentry"
+    },
+    "extension_install": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Extension install proxy metadata, including installed version and first-activation marker.",
+      "endPoint": "Sentry"
+    },
+    "target_extension_version": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The installed Anthropic Claude Code extension version, or not-installed.",
+      "endPoint": "Sentry"
+    },
+    "target_extension": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Target extension id, installed flag, version, activation state, and redacted extension path.",
+      "endPoint": "Sentry"
+    }
   }
 }

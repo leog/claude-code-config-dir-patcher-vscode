@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Config Dir Patcher",
   "description": "Patches Anthropic Claude Code for VS Code so claudeCode.environmentVariables CLAUDE_CONFIG_DIR affects extension auth/session storage.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "leog",
   "license": "MIT",
   "icon": "assets/icon.png",
@@ -47,10 +47,10 @@
           "default": false,
           "description": "Show a notification when startup auto-patching succeeds or is already applied."
         },
-        "claudeConfigDirPatcher.errorAnalytics.enabled": {
+        "claudeConfigDirPatcher.analytics.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Allow this extension to send redacted error reports to Sentry when VS Code telemetry is also enabled.",
+          "description": "Allow this extension to send redacted error reports and a first-activation install event to Sentry when VS Code telemetry is also enabled.",
           "tags": [
             "telemetry",
             "usesOnlineServices"

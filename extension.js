@@ -10,6 +10,7 @@ const SENTRY_DSN =
   "https://cd6cc7db78c15551abba61c188056ad1@o4511368420196352.ingest.us.sentry.io/4511368450342912";
 const SENTRY_FLUSH_TIMEOUT_MS = 2000;
 const SENTRY_STRING_MAX_LENGTH = 1200;
+const INSTALL_ANALYTICS_REPORTED_KEY = "analytics.installEventReported";
 
 let sentry;
 let sentryEnabled = false;
@@ -50,8 +51,13 @@ function getPackageInfo(context) {
   };
 }
 
-function canSendErrorAnalytics() {
-  return vscode.env.isTelemetryEnabled && getConfig().get("errorAnalytics.enabled", true);
+function canSendAnalytics() {
+  const config = getConfig();
+  if (config.get("errorAnalytics.enabled", true) === false) {
+    return false;
+  }
+
+  return vscode.env.isTelemetryEnabled && config.get("analytics.enabled", true);
 }
 
 function loadSentry() {
@@ -95,24 +101,29 @@ function getSentryIntegrations() {
   ].filter(Boolean);
 }
 
-function initializeErrorAnalytics(context) {
-  updateErrorAnalytics(context);
+function initializeAnalytics(context) {
+  updateAnalytics(context);
 
   context.subscriptions.push(
     vscode.env.onDidChangeTelemetryEnabled(() => {
-      updateErrorAnalytics(context);
+      updateAnalytics(context);
+      void reportInstallAnalytics(context);
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("claudeConfigDirPatcher.errorAnalytics")) {
-        updateErrorAnalytics(context);
+      if (
+        event.affectsConfiguration("claudeConfigDirPatcher.analytics") ||
+        event.affectsConfiguration("claudeConfigDirPatcher.errorAnalytics")
+      ) {
+        updateAnalytics(context);
+        void reportInstallAnalytics(context);
       }
     })
   );
 }
 
-function updateErrorAnalytics(context) {
-  if (!canSendErrorAnalytics()) {
-    void closeErrorAnalytics();
+function updateAnalytics(context) {
+  if (!canSendAnalytics()) {
+    void closeAnalytics();
     return;
   }
 
@@ -129,7 +140,7 @@ function updateErrorAnalytics(context) {
   }
 
   if (sentryEnabled) {
-    void closeErrorAnalytics();
+    void closeAnalytics();
   }
 
   sentry = sdk;
@@ -162,7 +173,7 @@ function updateErrorAnalytics(context) {
 }
 
 function captureError(error, source) {
-  if (!sentryEnabled || !canSendErrorAnalytics()) {
+  if (!sentryEnabled || !canSendAnalytics()) {
     return;
   }
 
@@ -181,6 +192,32 @@ function captureError(error, source) {
     });
   } catch (_captureError) {
     // Error analytics must never break the extension's primary behavior.
+  }
+}
+
+function captureAnalyticsEvent(eventName, { contexts = {}, tags = {} } = {}) {
+  if (!sentryEnabled || !canSendAnalytics()) {
+    return false;
+  }
+
+  const sdk = loadSentry();
+  if (!sdk) {
+    return false;
+  }
+
+  try {
+    sdk.captureEvent({
+      message: eventName,
+      level: "info",
+      tags: {
+        analytics_event: eventName,
+        ...tags,
+      },
+      contexts,
+    });
+    return true;
+  } catch (_captureError) {
+    return false;
   }
 }
 
@@ -264,7 +301,7 @@ function redactSensitiveText(value) {
   return redacted;
 }
 
-async function closeErrorAnalytics() {
+async function closeAnalytics() {
   if (!sentryEnabled || !sentry) {
     return;
   }
@@ -276,6 +313,41 @@ async function closeErrorAnalytics() {
     await sentry.close(SENTRY_FLUSH_TIMEOUT_MS);
   } catch (_error) {
     // Best-effort flush only.
+  }
+}
+
+async function reportInstallAnalytics(context) {
+  try {
+    if (context.globalState.get(INSTALL_ANALYTICS_REPORTED_KEY)) {
+      return;
+    }
+
+    const packageInfo = getPackageInfo(context);
+    const captured = captureAnalyticsEvent("extension.installed", {
+      contexts: {
+        extension_install: {
+          name: packageInfo.name,
+          version: packageInfo.version,
+          installedVersion: packageInfo.version,
+          activation: "firstActivation",
+        },
+        target_extension: getTargetExtensionContext(),
+      },
+      tags: {
+        extension_version: packageInfo.version,
+        installed_version: packageInfo.version,
+        target_extension_version: getTargetExtensionVersion(),
+      },
+    });
+
+    if (captured) {
+      await context.globalState.update(INSTALL_ANALYTICS_REPORTED_KEY, {
+        version: packageInfo.version,
+        reportedAt: new Date().toISOString(),
+      });
+    }
+  } catch (_error) {
+    // Install analytics should never affect activation.
   }
 }
 
@@ -523,7 +595,8 @@ function withErrorAnalytics(source, task) {
 }
 
 function activate(context) {
-  initializeErrorAnalytics(context);
+  initializeAnalytics(context);
+  void reportInstallAnalytics(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -549,7 +622,7 @@ function activate(context) {
 }
 
 async function deactivate() {
-  await closeErrorAnalytics();
+  await closeAnalytics();
 }
 
 module.exports = {

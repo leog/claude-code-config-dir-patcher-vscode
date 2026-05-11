@@ -28,14 +28,16 @@ By default the patch is applied automatically on startup. A backup is written ne
 
 ## Error analytics
 
-This extension can send redacted error reports to Sentry when patching, verification, restore, or startup auto-patching fails. Reports are sent only when all of these are true:
+This extension can send redacted error reports to Sentry when patching, verification, restore, or startup auto-patching fails. It also sends a one-time `extension.installed` event on first activation to estimate install counts and installed version distribution. Analytics are sent only when all of these are true:
 
 - VS Code telemetry is enabled.
-- `claudeConfigDirPatcher.errorAnalytics.enabled` is enabled.
+- `claudeConfigDirPatcher.analytics.enabled` is enabled.
 
 The extension does not send default PII, user identifiers, request data, or file contents. Home directory paths in error messages and stack traces are replaced before sending.
 
 Error reports include the installed Claude Code extension version, redacted target `extension.js` path, backup presence, target source size, a short target source hash, and patch-point status flags so patch failures can be diagnosed without sending the target source file.
+
+The install event includes this extension's installed version and the installed Claude Code extension version when available.
 
 ## Per-profile setup
 
