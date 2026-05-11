@@ -26,6 +26,17 @@ By default the patch is applied automatically on startup. A backup is written ne
 .claude-config-dir-patcher.bak
 ```
 
+## Error analytics
+
+This extension can send redacted error reports to Sentry when patching, verification, restore, or startup auto-patching fails. Reports are sent only when all of these are true:
+
+- VS Code telemetry is enabled.
+- `claudeConfigDirPatcher.errorAnalytics.enabled` is enabled.
+
+The extension does not send default PII, user identifiers, request data, or file contents. Home directory paths in error messages and stack traces are replaced before sending.
+
+Error reports include the installed Claude Code extension version, redacted target `extension.js` path, backup presence, target source size, a short target source hash, and patch-point status flags so patch failures can be diagnosed without sending the target source file.
+
 ## Per-profile setup
 
 Set this in each VS Code profile's settings.
@@ -50,7 +61,11 @@ After applying the patch, reload VS Code before using Claude Code.
 
 ## Local packaging
 
-This repo intentionally has no build dependencies. Package a VSIX with:
+Install dependencies, then package a VSIX with:
+
+```sh
+npm install
+```
 
 ```sh
 npm run package

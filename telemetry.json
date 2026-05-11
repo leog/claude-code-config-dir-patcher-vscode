@@ -1,0 +1,90 @@
+{
+  "claudeConfigDirPatcher.error": {
+    "owner": "leog",
+    "comment": "Sent only when VS Code telemetry is enabled, this extension's error analytics setting is enabled, and an activation or command error occurs.",
+    "source": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The extension operation that failed, for example startup.autoPatch or command.apply.",
+      "endPoint": "Sentry"
+    },
+    "error_name": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The JavaScript error name after redaction.",
+      "endPoint": "Sentry"
+    },
+    "exception": {
+      "classification": "CallstackOrException",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The redacted exception message and stack. Home directory paths are replaced before sending.",
+      "endPoint": "Sentry"
+    },
+    "extension_name": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The extension package name.",
+      "endPoint": "Sentry"
+    },
+    "release": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The extension package name and version.",
+      "endPoint": "Sentry"
+    },
+    "environment": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Whether the extension is running in production, development, or test mode.",
+      "endPoint": "Sentry"
+    },
+    "vscode_ui_kind": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Whether VS Code is running on desktop or web.",
+      "endPoint": "Sentry"
+    },
+    "vscode_remote_name": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The VS Code remote kind, or none when not connected to a remote extension host.",
+      "endPoint": "Sentry"
+    },
+    "runtime": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "VS Code and Node.js version metadata.",
+      "endPoint": "Sentry"
+    },
+    "target_extension_version": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "The installed Anthropic Claude Code extension version, or not-installed.",
+      "endPoint": "Sentry"
+    },
+    "target_source_sha256": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "A short SHA-256 prefix of the target extension.js file used to correlate unrecognized Claude Code builds without sending source contents.",
+      "endPoint": "Sentry"
+    },
+    "target_extension": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Target extension id, installed flag, version, activation state, and redacted extension path.",
+      "endPoint": "Sentry"
+    },
+    "patch_target": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Redacted target file path, backup presence, target source length, and short target source hash.",
+      "endPoint": "Sentry"
+    },
+    "patch_status": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Boolean patch-point analysis for environmentVariables propagation and IDE path handling.",
+      "endPoint": "Sentry"
+    }
+  }
+}

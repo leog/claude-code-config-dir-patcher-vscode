@@ -28,7 +28,10 @@
   ],
   "main": "./extension.js",
   "scripts": {
-    "package": "node scripts/package-vsix.js"
+    "package": "npx --yes @vscode/vsce@3.9.1 package"
+  },
+  "dependencies": {
+    "@sentry/core": "10.52.0"
   },
   "contributes": {
     "configuration": {
@@ -43,6 +46,15 @@
           "type": "boolean",
           "default": false,
           "description": "Show a notification when startup auto-patching succeeds or is already applied."
+        },
+        "claudeConfigDirPatcher.errorAnalytics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow this extension to send redacted error reports to Sentry when VS Code telemetry is also enabled.",
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ]
         }
       }
     },
