@@ -486,7 +486,24 @@ function patchIdePath(source) {
   });
 }
 
-function applyPatch() {
+// Windows AV scanners and the extension host briefly hold the target file open
+// after activation, surfacing as EBUSY/EPERM on writeFileSync. Retry with backoff.
+async function retryOnTransientLock(operation) {
+  const delays = [50, 150, 400, 1000];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return operation();
+    } catch (error) {
+      const code = error && error.code;
+      if ((code !== "EBUSY" && code !== "EPERM") || attempt === delays.length) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
+  }
+}
+
+async function applyPatch() {
   const { filePath, source } = readTarget();
   const status = analyze(source);
   let next = source;
@@ -517,10 +534,10 @@ function applyPatch() {
 
   const backupPath = `${filePath}${BACKUP_SUFFIX}`;
   if (!fs.existsSync(backupPath)) {
-    fs.copyFileSync(filePath, backupPath);
+    await retryOnTransientLock(() => fs.copyFileSync(filePath, backupPath));
   }
 
-  fs.writeFileSync(filePath, next, "utf8");
+  await retryOnTransientLock(() => fs.writeFileSync(filePath, next, "utf8"));
   return { filePath, changed: true, changes };
 }
 
@@ -553,7 +570,7 @@ async function promptReload(message) {
 }
 
 async function applyAndReport({ quiet = false } = {}) {
-  const result = applyPatch();
+  const result = await applyPatch();
   if (result.changed) {
     await promptReload(
       `Claude Code Config Dir patch applied: ${result.changes.join(", ")}. Reload VS Code before using Claude Code.`
