@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Config Dir Patcher",
   "description": "Patches Anthropic Claude Code for VS Code so claudeCode.environmentVariables CLAUDE_CONFIG_DIR affects extension auth/session storage.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "leog",
   "license": "MIT",
   "icon": "assets/icon.png",
@@ -21,17 +21,16 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:claudeConfigDirPatcher.apply",
-    "onCommand:claudeConfigDirPatcher.verify",
-    "onCommand:claudeConfigDirPatcher.restore"
+    "onStartupFinished"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "extensionDependencies": [
     "anthropic.claude-code"
   ],
   "scripts": {
-    "package": "npx --yes @vscode/vsce@3.9.1 package"
+    "build": "node scripts/build.mjs",
+    "check-upstream": "node scripts/check-upstream-patchability.mjs",
+    "package": "npm run build && npx --yes @vscode/vsce@3.9.1 package"
   },
   "dependencies": {
     "@sentry/core": "10.52.0"
@@ -75,5 +74,8 @@
         "title": "Claude Config Dir Patcher: Restore Backup"
       }
     ]
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
   }
 }

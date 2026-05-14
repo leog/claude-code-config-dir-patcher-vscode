@@ -1,7 +1,13 @@
 .git/**
+.github/**
+.codex/**
+.claude/**
+.gitignore
+.vscodeignore
 .DS_Store
 *.vsix
-node_modules/@sentry/core/build/esm/**
-node_modules/@sentry/core/build/types/**
-node_modules/@sentry/core/build/types-ts3.8/**
-node_modules/@sentry/core/**/*.map
+node_modules/**
+scripts/**
+extension.js
+patch-regexes.js
+package-lock.json
