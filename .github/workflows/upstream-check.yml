@@ -19,8 +19,39 @@ jobs:
         with:
           node-version: "20"
 
+      # Cheap step: one marketplace API call to resolve the latest versions, then
+      # derive a cache key from (resolved version+platform set, patch logic hash).
+      # No VSIX downloads happen here. Exit 2 (marketplace error) leaves the key
+      # empty so the cache lookup is skipped and the full check runs as a fallback.
+      - name: Resolve cache key
+        id: key
+        run: |
+          set +e
+          node scripts/check-upstream-patchability.mjs --print-cache-key
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Could not resolve cache key (exit $code); will run the full check without cache."
+          fi
+
+      # A cache hit means: same upstream builds AND same patch logic as the last
+      # green run. The cached value is just a sentinel marker; restoring it is
+      # enough to know we can skip the ~24 VSIX downloads.
+      - name: Restore previous pass marker
+        id: cache
+        if: steps.key.outputs.key != ''
+        uses: actions/cache@v4
+        with:
+          path: .patchcheck-pass
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Skip note
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: echo "Cache hit for ${{ steps.key.outputs.key }} — upstream builds and patch logic unchanged since the last passing run. Skipping the full check."
+
       - name: Run patchability check
         id: check
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           set +e
           node scripts/check-upstream-patchability.mjs
@@ -29,6 +60,11 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" -eq 2 ]; then
             echo "::warning::Marketplace/network error during scheduled check (exit 2); skipping issue creation."
+          fi
+          if [ "$code" -eq 0 ]; then
+            # Write the sentinel so actions/cache saves it under the key at job end,
+            # letting the next run with an unchanged key skip the downloads.
+            echo "ok" > .patchcheck-pass
           fi
           exit "$code"
 
