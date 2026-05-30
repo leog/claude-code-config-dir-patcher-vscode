@@ -30,6 +30,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check-upstream": "node scripts/check-upstream-patchability.mjs",
+    "verify-patch": "node scripts/check-upstream-patchability.mjs",
     "package": "npm run build && npx --yes @vscode/vsce@3.9.1 package"
   },
   "dependencies": {
