@@ -22,13 +22,18 @@
 // hard-failing on genuine patch breaks, and let the scheduled job open a
 // tracking issue only on code 1.
 import { execSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const { analyze, applyPatch } = require("../patch-core.js");
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(scriptDir, "..");
 
 const TARGET_EXTENSION = "anthropic.claude-code";
 const DEFAULT_VERSION_COUNT = 3;
@@ -42,8 +47,13 @@ function parseArgs(argv) {
   let versions = null;
   let platforms = null;
   let count = DEFAULT_VERSION_COUNT;
+  // When set, do only the cheap marketplace version lookup and print a cache key
+  // (no VSIX downloads), so CI can skip the heavy check when nothing changed.
+  let printCacheKey = false;
   for (const arg of argv) {
-    if (arg.startsWith("--versions=")) {
+    if (arg === "--print-cache-key") {
+      printCacheKey = true;
+    } else if (arg.startsWith("--versions=")) {
       versions = arg
         .slice("--versions=".length)
         .split(",")
@@ -62,7 +72,39 @@ function parseArgs(argv) {
       }
     }
   }
-  return { versions, platforms, count };
+  return { versions, platforms, count, printCacheKey };
+}
+
+// A short hash of the patch logic. If the regexes or the apply/analyze code
+// change, the cache key changes even when upstream versions are identical, so a
+// logic edit always forces a fresh verification.
+function patchLogicHash() {
+  const files = ["patch-regexes.js", "patch-core.js"];
+  const hash = createHash("sha256");
+  for (const file of files) {
+    hash.update(file);
+    hash.update("\0");
+    hash.update(readFileSync(join(repoRoot, file)));
+    hash.update("\0");
+  }
+  return hash.digest("hex").slice(0, 16);
+}
+
+// Deterministic cache key over (resolved version+platform set, patch logic).
+// Two runs produce the same key iff upstream publishes the same builds AND the
+// patcher's logic is unchanged — exactly when re-verifying would be redundant.
+function buildCacheKey(targets) {
+  const builds = targets
+    .map((t) => `${t.version}:${[...t.platforms].sort().join(",")}`)
+    .sort()
+    .join("|");
+  const digest = createHash("sha256")
+    .update(builds)
+    .update("\0")
+    .update(patchLogicHash())
+    .digest("hex")
+    .slice(0, 24);
+  return `patchcheck-${digest}`;
 }
 
 // Returns the newest `count` versions, each with the list of target platforms
@@ -215,9 +257,8 @@ function verifyBuild(source) {
 }
 
 async function main() {
-  const { versions: explicit, platforms: requestedPlatforms, count } = parseArgs(
-    process.argv.slice(2)
-  );
+  const { versions: explicit, platforms: requestedPlatforms, count, printCacheKey } =
+    parseArgs(process.argv.slice(2));
 
   // When versions are passed explicitly we don't know their platform set from a
   // query, so fall back to the requested platforms (or universal if none given).
@@ -227,6 +268,25 @@ async function main() {
         platforms: requestedPlatforms ?? [UNIVERSAL],
       }))
     : await fetchLatestVersions(count);
+
+  // Cache-key mode: only the cheap version lookup ran above (no downloads).
+  // Emit the key for CI to cache against and exit. A `key=` line is written to
+  // GITHUB_OUTPUT when available so a workflow step can consume it directly.
+  if (printCacheKey) {
+    const key = buildCacheKey(
+      targets.map((t) => ({
+        version: t.version,
+        platforms: requestedPlatforms
+          ? t.platforms.filter((p) => requestedPlatforms.includes(p))
+          : t.platforms,
+      }))
+    );
+    console.log(key);
+    if (process.env.GITHUB_OUTPUT) {
+      writeFileSync(process.env.GITHUB_OUTPUT, `key=${key}\n`, { flag: "a" });
+    }
+    return;
+  }
 
   const totalBuilds = targets.reduce((sum, t) => {
     const plats = requestedPlatforms
