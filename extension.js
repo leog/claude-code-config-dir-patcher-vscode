@@ -4,11 +4,10 @@ const os = require("os");
 const path = require("path");
 const vscode = require("vscode");
 const {
-  ENV_NEEDLE_REGEX,
-  ENV_PATCHED_REGEX,
-  IDE_NEEDLE_REGEX,
-  IDE_PATCHED_REGEX,
-} = require("./patch-regexes");
+  analyze,
+  patchEnv,
+  patchIdePath,
+} = require("./patch-core");
 
 const TARGET_EXTENSION_ID = "anthropic.claude-code";
 const BACKUP_SUFFIX = ".claude-config-dir-patcher.bak";
@@ -456,27 +455,6 @@ function readTarget() {
   } catch (error) {
     throw addErrorAnalytics(error, getTargetOnlyDiagnostics(filePath));
   }
-}
-
-function analyze(source) {
-  return {
-    envPatched: ENV_PATCHED_REGEX.test(source),
-    envPatchable: ENV_NEEDLE_REGEX.test(source),
-    idePatched: IDE_PATCHED_REGEX.test(source),
-    idePatchable: IDE_NEEDLE_REGEX.test(source),
-  };
-}
-
-function patchEnv(source) {
-  return source.replace(ENV_NEEDLE_REGEX, (match, _itemName, _collection, envObjName) => {
-    return `if(${envObjName}.CLAUDE_CONFIG_DIR)process.env.CLAUDE_CONFIG_DIR=${envObjName}.CLAUDE_CONFIG_DIR;${match}`;
-  });
-}
-
-function patchIdePath(source) {
-  return source.replace(IDE_NEEDLE_REGEX, (_match, varName, pathModuleName, osModuleName) => {
-    return `let ${varName}=${pathModuleName}.join(process.env.CLAUDE_CONFIG_DIR||${pathModuleName}.join(${osModuleName}.homedir(),".claude"),"ide");return`;
-  });
 }
 
 // Windows AV scanners and the extension host briefly hold the target file open

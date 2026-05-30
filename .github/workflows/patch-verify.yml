@@ -1,0 +1,40 @@
+name: Patch verify (latest 3)
+
+# Gates PRs and pushes by applying the real patch core against the latest 3
+# anthropic.claude-code builds. Because the check downloads VSIXs live from the
+# marketplace, a marketplace/network hiccup (exit code 2) soft-passes so it does
+# not block merges, while a genuine patch regression (exit code 1) fails the job.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Apply/verify patch against latest 3 versions
+        run: |
+          set +e
+          node scripts/check-upstream-patchability.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "Patch verified against the latest 3 versions."
+          elif [ "$code" -eq 2 ]; then
+            echo "::warning::Marketplace/network error while verifying patch (exit 2). Soft-passing so the merge is not blocked by upstream infra."
+          else
+            echo "::error::Patch regression detected against one or more recent versions (exit $code)."
+            exit 1
+          fi

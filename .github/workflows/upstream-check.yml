@@ -21,10 +21,20 @@ jobs:
 
       - name: Run patchability check
         id: check
-        run: node scripts/check-upstream-patchability.mjs
+        run: |
+          set +e
+          node scripts/check-upstream-patchability.mjs
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 2 ]; then
+            echo "::warning::Marketplace/network error during scheduled check (exit 2); skipping issue creation."
+          fi
+          exit "$code"
 
       - name: Open tracking issue on regression
-        if: failure() && steps.check.outcome == 'failure'
+        # Only a real regression (exit 1) opens an issue; infra errors (exit 2) are skipped.
+        if: failure() && steps.check.outputs.code == '1'
         uses: actions/github-script@v7
         with:
           script: |
@@ -46,9 +56,9 @@ jobs:
               repo: context.repo.repo,
               title,
               body: [
-                "The daily upstream patchability check failed: neither the env-patch needle nor the already-patched form matched the latest anthropic.claude-code VSIX.",
+                "The daily upstream patchability check failed: one or more of the latest 3 anthropic.claude-code builds no longer apply/verify cleanly.",
                 "",
-                "This usually means upstream changed the minified output and the patcher's `ENV_NEEDLE_REGEX` / `ENV_PATCHED_REGEX` in `extension.js` need to be updated before users on the new build will get a working patch.",
+                "This usually means upstream changed the minified output and the patcher's regexes in `patch-regexes.js` need to be updated before users on the new build will get a working patch. See the run logs for the specific failing version(s).",
                 "",
                 `Workflow run: ${runUrl}`,
               ].join("\n"),
