@@ -2,6 +2,13 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.8
+
+- Rename the extension to "Claude Code Profiles" and refresh the Marketplace
+  metadata (display name, description, keywords, and categories) for
+  discoverability. The internal extension ID, command IDs, and configuration
+  keys are unchanged, so existing settings keep working.
+
 ## 0.1.7
 
 - Bundle the extension with esbuild. The VSIX drops from 447 KB / 222 files to

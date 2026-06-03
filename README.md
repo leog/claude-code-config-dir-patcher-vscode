@@ -1,6 +1,6 @@
-# Claude Code Config Dir Patcher
+# Claude Code Profiles
 
-This VS Code extension patches Anthropic's `anthropic.claude-code` extension so this setting affects both spawned Claude processes and the extension auth/session layer:
+This VS Code extension lets you run multiple Claude Code accounts by patching Anthropic's `anthropic.claude-code` extension so this setting affects both spawned Claude processes and the extension auth/session layer:
 
 ```json
 "claudeCode.environmentVariables": [
@@ -16,9 +16,9 @@ This patch makes the configured `CLAUDE_CONFIG_DIR` visible to the extension pro
 
 ## Commands
 
-- `Claude Config Dir Patcher: Apply Patch`
-- `Claude Config Dir Patcher: Verify Patch`
-- `Claude Config Dir Patcher: Restore Backup`
+- `Claude Code Profiles: Apply Patch`
+- `Claude Code Profiles: Verify Patch`
+- `Claude Code Profiles: Restore Backup`
 
 By default the patch is applied automatically on startup. A backup is written next to Anthropic's `extension.js` with this suffix:
 

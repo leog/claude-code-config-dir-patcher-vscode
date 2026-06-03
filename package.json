@@ -1,8 +1,25 @@
 {
   "name": "claude-code-config-dir-patcher",
-  "displayName": "Claude Code Config Dir Patcher",
-  "description": "Patches Anthropic Claude Code for VS Code so claudeCode.environmentVariables CLAUDE_CONFIG_DIR affects extension auth/session storage.",
-  "version": "0.1.7",
+  "displayName": "Claude Code Profiles",
+  "description": "Use multiple Claude Code accounts in VS Code. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR isolates auth/session storage per VS Code profile, enabling per-profile account switching.",
+  "version": "0.1.8",
+  "keywords": [
+    "claude",
+    "claude code",
+    "anthropic",
+    "profiles",
+    "profile",
+    "account",
+    "accounts",
+    "multi-account",
+    "account switching",
+    "CLAUDE_CONFIG_DIR",
+    "config dir",
+    "auth",
+    "session",
+    "isolation",
+    "ai"
+  ],
   "publisher": "leog",
   "license": "MIT",
   "icon": "assets/icon.png",
@@ -18,6 +35,7 @@
     "vscode": "^1.94.0"
   },
   "categories": [
+    "AI",
     "Other"
   ],
   "activationEvents": [
@@ -38,7 +56,7 @@
   },
   "contributes": {
     "configuration": {
-      "title": "Claude Code Config Dir Patcher",
+      "title": "Claude Code Profiles",
       "properties": {
         "claudeConfigDirPatcher.autoPatch": {
           "type": "boolean",
@@ -64,15 +82,15 @@
     "commands": [
       {
         "command": "claudeConfigDirPatcher.apply",
-        "title": "Claude Config Dir Patcher: Apply Patch"
+        "title": "Claude Code Profiles: Apply Patch"
       },
       {
         "command": "claudeConfigDirPatcher.verify",
-        "title": "Claude Config Dir Patcher: Verify Patch"
+        "title": "Claude Code Profiles: Verify Patch"
       },
       {
         "command": "claudeConfigDirPatcher.restore",
-        "title": "Claude Config Dir Patcher: Restore Backup"
+        "title": "Claude Code Profiles: Restore Backup"
       }
     ]
   },
