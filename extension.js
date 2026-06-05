@@ -25,6 +25,32 @@ function getConfig() {
   return vscode.workspace.getConfiguration("claudeConfigDirPatcher");
 }
 
+// Claude Code's storage helpers (history, auth, sessions) read
+// process.env.CLAUDE_CONFIG_DIR live. The launch-env patch only sets that var
+// when the CLI is spawned, so views that load before any spawn — most visibly
+// the chat history — resolve to the default ~/.claude and appear empty after a
+// profile switch. We share the extension host process with anthropic.claude-code,
+// so mirroring the configured value into process.env here makes those reads
+// resolve to the selected profile dir immediately, before anything is launched.
+function syncConfigDirEnv() {
+  try {
+    const entries = vscode.workspace
+      .getConfiguration("claudeCode")
+      .get("environmentVariables");
+    if (!Array.isArray(entries)) {
+      return;
+    }
+    const entry = entries.find(
+      (item) => item && item.name === "CLAUDE_CONFIG_DIR" && item.value
+    );
+    if (entry) {
+      process.env.CLAUDE_CONFIG_DIR = String(entry.value);
+    }
+  } catch (_error) {
+    // Never let env mirroring break activation.
+  }
+}
+
 function getExtensionEnvironment(context) {
   if (context.extensionMode === vscode.ExtensionMode.Development) {
     return "development";
@@ -583,8 +609,17 @@ function withErrorAnalytics(source, task) {
 }
 
 function activate(context) {
+  syncConfigDirEnv();
   initializeAnalytics(context);
   void reportInstallAnalytics(context);
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("claudeCode.environmentVariables")) {
+        syncConfigDirEnv();
+      }
+    })
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(

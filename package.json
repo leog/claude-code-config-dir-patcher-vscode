@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Profiles",
   "description": "Use multiple Claude Code accounts in VS Code. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR isolates auth/session storage per VS Code profile, enabling per-profile account switching.",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "keywords": [
     "claude",
     "claude code",
