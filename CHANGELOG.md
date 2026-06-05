@@ -2,6 +2,19 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.9
+
+- Fix empty Claude Code chat history after switching VS Code profiles
+  ([#3](https://github.com/leog/claude-code-config-dir-patcher-vscode/issues/3)).
+  Claude Code's storage helpers read `process.env.CLAUDE_CONFIG_DIR` live, but
+  the launch-env patch only set that variable when the CLI was spawned — so
+  views that load before any spawn (most visibly the chat history) resolved to
+  the default `~/.claude` and appeared empty even though the per-profile dir
+  held the data. The patcher now mirrors the configured `CLAUDE_CONFIG_DIR`
+  into the shared extension host's `process.env` at activation and on
+  configuration changes, so history and other storage reads resolve to the
+  selected profile dir immediately.
+
 ## 0.1.8
 
 - Rename the extension to "Claude Code Profiles" and refresh the Marketplace
