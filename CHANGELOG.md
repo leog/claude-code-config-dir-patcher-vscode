@@ -2,6 +2,15 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.10
+
+- Fix a spurious "Could not find the claudeCode.environmentVariables launch-env
+  patch point" error on startup (NODE-5). While Claude Code installs or updates,
+  VS Code truncates its `extension.js` before rewriting it, so the auto-patch
+  could momentarily read the file as empty (0 bytes) and fail. The patcher now
+  retries the read with backoff and, if the target is still empty, skips quietly
+  — Claude Code's own activation rewrites the file and re-triggers the patch.
+
 ## 0.1.9
 
 - Fix empty Claude Code chat history after switching VS Code profiles

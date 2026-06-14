@@ -483,6 +483,19 @@ function readTarget() {
   }
 }
 
+// While Claude Code installs or updates, VS Code truncates extension.js before
+// rewriting it, so a startup read can momentarily return an empty file. Retry
+// with backoff so we patch the real content rather than failing on the gap.
+async function readTargetWithRetry() {
+  const delays = [50, 150, 400, 1000];
+  let result = readTarget();
+  for (let attempt = 0; result.source.length === 0 && attempt < delays.length; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    result = readTarget();
+  }
+  return result;
+}
+
 // Windows AV scanners and the extension host briefly hold the target file open
 // after activation, surfacing as EBUSY/EPERM on writeFileSync. Retry with backoff.
 async function retryOnTransientLock(operation) {
@@ -501,7 +514,15 @@ async function retryOnTransientLock(operation) {
 }
 
 async function applyPatch() {
-  const { filePath, source } = readTarget();
+  const { filePath, source } = await readTargetWithRetry();
+
+  // An empty target means Claude Code is mid-install/update. Its activation will
+  // rewrite extension.js and re-trigger ours, so skip quietly instead of raising
+  // a spurious "patch point missing" error.
+  if (source.length === 0) {
+    return { filePath, changed: false, changes: [], skipped: "empty-target" };
+  }
+
   const status = analyze(source);
   let next = source;
   const changes = [];
@@ -572,6 +593,12 @@ async function applyAndReport({ quiet = false } = {}) {
     await promptReload(
       `Claude Code Config Dir patch applied: ${result.changes.join(", ")}. Reload VS Code before using Claude Code.`
     );
+  } else if (result.skipped === "empty-target") {
+    if (!quiet) {
+      vscode.window.showWarningMessage(
+        "Claude Code appears to be installing or updating. Run the patch again once it finishes."
+      );
+    }
   } else if (!quiet) {
     vscode.window.showInformationMessage("Claude Code Config Dir patch is already applied.");
   }
