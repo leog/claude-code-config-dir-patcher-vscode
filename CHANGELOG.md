@@ -2,6 +2,18 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.11
+
+- Fix a spurious "Could not find the claudeCode.environmentVariables launch-env
+  patch point" error that could still fire during a Claude Code update
+  (CLAUDE-EXTENSION-6). The 0.1.10 fix only handled a fully-truncated (0-byte)
+  read, but VS Code can also be caught mid-rewrite with a **partial** file on
+  disk — non-empty, so the empty-target guard missed it, yet missing the patch
+  point. The patcher now re-reads across a short window when the needle is
+  absent: if the file is still changing it's an in-progress update (re-check the
+  settled content, otherwise skip and let our hooks re-run); only a settled file
+  that still lacks the needle is reported as a genuine upstream regression.
+
 ## 0.1.10
 
 - Fix a spurious "Could not find the claudeCode.environmentVariables launch-env

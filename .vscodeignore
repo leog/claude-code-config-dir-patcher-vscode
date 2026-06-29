@@ -4,6 +4,7 @@
 .claude/**
 .gitignore
 .vscodeignore
+.mcp.json
 .DS_Store
 *.vsix
 node_modules/**

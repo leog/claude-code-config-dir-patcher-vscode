@@ -496,6 +496,28 @@ async function readTargetWithRetry() {
   return result;
 }
 
+// Re-read the target across a backoff window to tell an in-progress rewrite
+// apart from a settled file. The empty-file guard only catches a fully-truncated
+// read; an update can also be caught mid-write as a non-empty but partial file,
+// where the patch point legitimately isn't present yet. If the content changes
+// at any point during the window, Claude Code is still writing; if it never
+// changes, the file is settled (a genuine, stable patch target). Returns the
+// latest source plus whether any change was observed.
+async function readTargetUntilStable(initialSource) {
+  const delays = [50, 150, 400, 1000];
+  let latest = initialSource;
+  let changed = false;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    const { source } = readTarget();
+    if (source !== latest) {
+      changed = true;
+      latest = source;
+    }
+  }
+  return { source: latest, changed };
+}
+
 // Windows AV scanners and the extension host briefly hold the target file open
 // after activation, surfacing as EBUSY/EPERM on writeFileSync. Retry with backoff.
 async function retryOnTransientLock(operation) {
@@ -514,7 +536,7 @@ async function retryOnTransientLock(operation) {
 }
 
 async function applyPatch() {
-  const { filePath, source } = await readTargetWithRetry();
+  let { filePath, source } = await readTargetWithRetry();
 
   // An empty target means Claude Code is mid-install/update. Its activation will
   // rewrite extension.js and re-trigger ours, so skip quietly instead of raising
@@ -523,7 +545,29 @@ async function applyPatch() {
     return { filePath, changed: false, changes: [], skipped: "empty-target" };
   }
 
-  const status = analyze(source);
+  let status = analyze(source);
+
+  // A non-empty file whose env needle is absent may be a partial write captured
+  // while Claude Code rewrites extension.js during an update — the empty-file
+  // guard above only catches a fully-truncated read. Observe the file across a
+  // window before deciding: if it changed it was still being written, so re-check
+  // the settled content (it may now be patchable) and otherwise skip and let our
+  // hooks re-run; if it never changed it's a settled file, and a settled file
+  // that still lacks the needle is a genuine upstream regression worth reporting.
+  if (!status.envPatched && !status.envPatchable) {
+    const settled = await readTargetUntilStable(source);
+    if (settled.changed) {
+      source = settled.source;
+      if (source.length === 0) {
+        return { filePath, changed: false, changes: [], skipped: "empty-target" };
+      }
+      status = analyze(source);
+      if (!status.envPatched && !status.envPatchable) {
+        return { filePath, changed: false, changes: [], skipped: "target-unstable" };
+      }
+    }
+  }
+
   let next = source;
   const changes = [];
 
@@ -593,7 +637,7 @@ async function applyAndReport({ quiet = false } = {}) {
     await promptReload(
       `Claude Code Config Dir patch applied: ${result.changes.join(", ")}. Reload VS Code before using Claude Code.`
     );
-  } else if (result.skipped === "empty-target") {
+  } else if (result.skipped === "empty-target" || result.skipped === "target-unstable") {
     if (!quiet) {
       vscode.window.showWarningMessage(
         "Claude Code appears to be installing or updating. Run the patch again once it finishes."
