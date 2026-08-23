@@ -2,6 +2,23 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.12
+
+- Fix a spurious ENOENT error when Claude Code auto-updates on a remote host
+  (CLAUDE-EXTENSION-8). Updates install into a new versioned extension
+  directory and remove the old one, but the extension host keeps reporting the
+  stale path until it restarts, so the auto-patch tried to read an
+  `extension.js` that no longer exists. A missing target is now treated like an
+  empty or half-written one: skip quietly and let the host restart re-trigger
+  the patch.
+- Analytics now include an anonymous per-installation user id so Sentry can
+  count unique users instead of raw events. The id is a SHA-256 hash of VS
+  Code's random telemetry id (`vscode.env.machineId`) prefixed with this
+  extension's name — no personal, account, or hardware information, and not
+  correlatable with other products' telemetry. Documented in the README,
+  `telemetry.json`, and the `analytics.enabled` setting description; both
+  existing opt-outs (the setting and VS Code telemetry) still stop all sending.
+
 ## 0.1.11
 
 - Fix a spurious "Could not find the claudeCode.environmentVariables launch-env

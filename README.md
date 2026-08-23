@@ -33,11 +33,15 @@ This extension can send redacted error reports to Sentry when patching, verifica
 - VS Code telemetry is enabled.
 - `claudeConfigDirPatcher.analytics.enabled` is enabled.
 
-The extension does not send default PII, user identifiers, request data, or file contents. Home directory paths in error messages and stack traces are replaced before sending.
+The extension does not send default PII, request data, or file contents. Home directory paths in error messages and stack traces are replaced before sending.
+
+Every report carries an **anonymous user id** so unique users can be counted instead of raw event counts. It is a SHA-256 hash of VS Code's built-in random telemetry id (`vscode.env.machineId`) prefixed with this extension's name. It contains no account, hardware, or personal information, cannot be correlated with any other product's telemetry, and is the only identifier sent — no names, emails, IP addresses, or account ids.
 
 Error reports include the installed Claude Code extension version, redacted target `extension.js` path, backup presence, target source size, a short target source hash, and patch-point status flags so patch failures can be diagnosed without sending the target source file.
 
 The install event includes this extension's installed version and the installed Claude Code extension version when available.
+
+To opt out, disable `claudeConfigDirPatcher.analytics.enabled` or VS Code telemetry (`telemetry.telemetryLevel`); either alone stops all sending. The full field-by-field inventory of what can be sent is in [`telemetry.json`](https://github.com/leog/claude-code-config-dir-patcher-vscode/blob/main/telemetry.json), and all analytics code is open source in [`extension.js`](https://github.com/leog/claude-code-config-dir-patcher-vscode/blob/main/extension.js).
 
 ## Per-profile setup
 

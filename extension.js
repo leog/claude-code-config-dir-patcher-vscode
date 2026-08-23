@@ -176,6 +176,7 @@ function updateAnalytics(context) {
     beforeSend: scrubSentryEvent,
   });
 
+  sentry.getGlobalScope().setUser({ id: getAnalyticsUserId() });
   sentry.getGlobalScope().setTags({
     extension_name: packageInfo.name,
     vscode_ui_kind: vscode.env.uiKind === vscode.UIKind.Web ? "web" : "desktop",
@@ -188,6 +189,18 @@ function updateAnalytics(context) {
 
   sentryEnabled = true;
   sentryStateKey = stateKey;
+}
+
+// Anonymous per-installation id so Sentry can count unique users instead of raw
+// events. vscode.env.machineId is VS Code's random telemetry UUID (not derived
+// from hardware or account data); hashing it with an extension-specific prefix
+// means the value we send can't be correlated with any other product's telemetry.
+function getAnalyticsUserId() {
+  return crypto
+    .createHash("sha256")
+    .update(`claude-code-config-dir-patcher:${vscode.env.machineId}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 function captureError(error, source) {
@@ -290,7 +303,15 @@ function scrubTelemetryValue(value, depth = 0) {
 
   const scrubbed = {};
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === "user" || key === "request" || key === "server_name") {
+    if (key === "request" || key === "server_name") {
+      continue;
+    }
+    // Keep only the anonymous id we set ourselves out of any user object; drop
+    // everything else the SDK might attach (ip_address, email, username).
+    if (key === "user") {
+      if (nestedValue && typeof nestedValue === "object" && nestedValue.id) {
+        scrubbed[key] = { id: String(nestedValue.id) };
+      }
       continue;
     }
     scrubbed[key] = scrubTelemetryValue(nestedValue, depth + 1);
@@ -535,7 +556,24 @@ async function retryOnTransientLock(operation) {
   }
 }
 
+// Claude Code updates install into a new versioned directory and remove the old
+// one, but the extension host keeps reporting the stale extensionPath until it
+// restarts (seen on remote hosts as ENOENT reading extension.js —
+// CLAUDE-EXTENSION-8). The target being gone mid-update is the same transient
+// condition as it being empty or half-written: skip quietly and let the host
+// restart re-trigger the patch against the new install.
 async function applyPatch() {
+  try {
+    return await applyPatchToTarget();
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return { filePath: undefined, changed: false, changes: [], skipped: "target-missing" };
+    }
+    throw error;
+  }
+}
+
+async function applyPatchToTarget() {
   let { filePath, source } = await readTargetWithRetry();
 
   // An empty target means Claude Code is mid-install/update. Its activation will
@@ -637,7 +675,11 @@ async function applyAndReport({ quiet = false } = {}) {
     await promptReload(
       `Claude Code Config Dir patch applied: ${result.changes.join(", ")}. Reload VS Code before using Claude Code.`
     );
-  } else if (result.skipped === "empty-target" || result.skipped === "target-unstable") {
+  } else if (
+    result.skipped === "empty-target" ||
+    result.skipped === "target-unstable" ||
+    result.skipped === "target-missing"
+  ) {
     if (!quiet) {
       vscode.window.showWarningMessage(
         "Claude Code appears to be installing or updating. Run the patch again once it finishes."

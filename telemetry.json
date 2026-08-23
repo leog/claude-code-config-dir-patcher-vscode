@@ -8,6 +8,12 @@
       "comment": "The extension operation that failed, for example startup.autoPatch or command.apply.",
       "endPoint": "Sentry"
     },
+    "user": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "An anonymous per-installation id used to count unique users: a SHA-256 hash of VS Code's random telemetry id (vscode.env.machineId) prefixed with this extension's name. Contains no account, hardware, or personal information and cannot be correlated with other products' telemetry.",
+      "endPoint": "Sentry"
+    },
     "error_name": {
       "classification": "SystemMetaData",
       "purpose": "PerformanceAndHealth",
@@ -94,6 +100,12 @@
       "classification": "SystemMetaData",
       "purpose": "FeatureInsight",
       "comment": "The Sentry event name, extension.installed.",
+      "endPoint": "Sentry"
+    },
+    "user": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "An anonymous per-installation id used to count unique users: a SHA-256 hash of VS Code's random telemetry id (vscode.env.machineId) prefixed with this extension's name. Contains no account, hardware, or personal information and cannot be correlated with other products' telemetry.",
       "endPoint": "Sentry"
     },
     "extension_name": {

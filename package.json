@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Profiles",
   "description": "Use multiple Claude Code accounts in VS Code. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR isolates auth/session storage per VS Code profile, enabling per-profile account switching.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "keywords": [
     "claude",
     "claude code",
@@ -71,7 +71,7 @@
         "claudeConfigDirPatcher.analytics.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Allow this extension to send redacted error reports and a first-activation install event to Sentry when VS Code telemetry is also enabled.",
+          "description": "Allow this extension to send redacted error reports and a first-activation install event to Sentry when VS Code telemetry is also enabled. Reports carry an anonymous per-installation id (a hash of VS Code's random telemetry id) so unique users can be counted; no personal, account, or hardware information is sent. See the extension README and telemetry.json for the full inventory.",
           "tags": [
             "telemetry",
             "usesOnlineServices"
