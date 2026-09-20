@@ -2,6 +2,16 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.13
+
+- Add a one-time, non-modal review prompt. After the extension has been
+  installed for 14 days and the patch is verified as applied, a toast asks for a
+  Marketplace review with "Rate it", "Later" and "Don't ask again". "Later" or
+  dismissing re-asks once more after another 14 days; the prompt never shows
+  more than twice, never while a "Reload Window" prompt is up, and never after
+  "Rate it" or "Don't ask again". State lives in VS Code's per-profile global
+  storage; nothing is sent anywhere.
+
 ## 0.1.12
 
 - Fix a spurious ENOENT error when Claude Code auto-updates on a remote host

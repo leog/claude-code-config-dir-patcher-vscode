@@ -16,6 +16,11 @@ const SENTRY_DSN =
 const SENTRY_FLUSH_TIMEOUT_MS = 2000;
 const SENTRY_STRING_MAX_LENGTH = 1200;
 const INSTALL_ANALYTICS_REPORTED_KEY = "analytics.installEventReported";
+const REVIEW_PROMPT_KEY = "reviewPrompt";
+const REVIEW_PROMPT_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
+const REVIEW_PROMPT_MAX_ASKS = 2;
+const REVIEW_URL =
+  "https://marketplace.visualstudio.com/items?itemName=leog.claude-code-config-dir-patcher&ssr=false#review-details";
 
 let sentry;
 let sentryEnabled = false;
@@ -390,6 +395,38 @@ async function reportInstallAnalytics(context) {
   }
 }
 
+async function maybeAskForReview(context) {
+  try {
+    const state = context.globalState.get(REVIEW_PROMPT_KEY) || { since: Date.now(), asks: 0 };
+    const due =
+      !state.done &&
+      state.asks < REVIEW_PROMPT_MAX_ASKS &&
+      Date.now() - state.since >= REVIEW_PROMPT_AFTER_MS &&
+      verifyPatch().ok;
+    if (!due) {
+      await context.globalState.update(REVIEW_PROMPT_KEY, state);
+      return;
+    }
+
+    const choice = await vscode.window.showInformationMessage(
+      "Enjoying Claude Code Profiles? A quick Marketplace review helps others find it.",
+      "Rate it",
+      "Later",
+      "Don't ask again"
+    );
+    if (choice === "Rate it") {
+      await vscode.env.openExternal(vscode.Uri.parse(REVIEW_URL));
+    }
+    await context.globalState.update(REVIEW_PROMPT_KEY, {
+      since: Date.now(),
+      asks: state.asks + 1,
+      done: choice === "Rate it" || choice === "Don't ask again",
+    });
+  } catch (_error) {
+    // The review prompt must never affect activation.
+  }
+}
+
 function createAnalyticsError(message, analytics) {
   const error = new Error(message);
   error.errorAnalytics = analytics;
@@ -688,6 +725,7 @@ async function applyAndReport({ quiet = false } = {}) {
   } else if (!quiet) {
     vscode.window.showInformationMessage("Claude Code Config Dir patch is already applied.");
   }
+  return result;
 }
 
 async function verifyAndReport() {
@@ -749,12 +787,15 @@ function activate(context) {
     )
   );
 
-  if (getConfig().get("autoPatch", true)) {
-    applyAndReport({ quiet: !getConfig().get("showStartupNotifications", false) }).catch((error) => {
-      captureError(error, "startup.autoPatch");
-      vscode.window.showWarningMessage(`Claude Code Config Dir auto-patch failed: ${error.message}`);
-    });
-  }
+  const startup = getConfig().get("autoPatch", true)
+    ? applyAndReport({ quiet: !getConfig().get("showStartupNotifications", false) }).catch((error) => {
+        captureError(error, "startup.autoPatch");
+        vscode.window.showWarningMessage(`Claude Code Config Dir auto-patch failed: ${error.message}`);
+        return { changed: true };
+      })
+    : Promise.resolve({ changed: false });
+  // Don't stack the review toast on top of a fresh "Reload Window" prompt.
+  void startup.then((result) => (result.changed ? undefined : maybeAskForReview(context)));
 }
 
 async function deactivate() {
