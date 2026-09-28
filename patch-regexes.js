@@ -3,12 +3,17 @@
 // by extension.js and at CI time by scripts/check-upstream-patchability.mjs.
 //
 // Capture groups for ENV_NEEDLE_REGEX: 1=loop var, 2=collection var, 3=env-object var.
+//
+// The launch-env loop has two known minified shapes:
+//   <= 2.1.274  for(let a of b)if(a.name)c[a.name]=a.value||"";return c.CLAUDE_CODE_ENTRYPOINT=
+//   >= 2.1.275  for(let a of b){if(a.name==="CLAUDE_CONFIG_DIR"&&a.value==="")continue;if(a.name)c[a.name]=a.value||""}return c.CLAUDE_CODE_ENTRYPOINT=
+// Both regexes accept either (optional brace, optional empty-CLAUDE_CONFIG_DIR skip).
 
 const ENV_NEEDLE_REGEX =
-  /for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)if\(\1\.name\)([A-Za-z_$][\w$]*)\[\1\.name\]=\1\.value\|\|"";return \3\.CLAUDE_CODE_ENTRYPOINT=/;
+  /for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)\{?(?:if\(\1\.name==="CLAUDE_CONFIG_DIR"&&\1\.value===""\)continue;)?if\(\1\.name\)([A-Za-z_$][\w$]*)\[\1\.name\]=\1\.value\|\|""[;}]return \3\.CLAUDE_CODE_ENTRYPOINT=/;
 
 const ENV_PATCHED_REGEX =
-  /if\(([A-Za-z_$][\w$]*)\.CLAUDE_CONFIG_DIR\)process\.env\.CLAUDE_CONFIG_DIR=\1\.CLAUDE_CONFIG_DIR;for\(let ([A-Za-z_$][\w$]*) of [A-Za-z_$][\w$]*\)if\(\2\.name\)\1\[\2\.name\]=\2\.value\|\|"";return \1\.CLAUDE_CODE_ENTRYPOINT=/;
+  /if\(([A-Za-z_$][\w$]*)\.CLAUDE_CONFIG_DIR\)process\.env\.CLAUDE_CONFIG_DIR=\1\.CLAUDE_CONFIG_DIR;for\(let ([A-Za-z_$][\w$]*) of [A-Za-z_$][\w$]*\)\{?(?:if\(\2\.name==="CLAUDE_CONFIG_DIR"&&\2\.value===""\)continue;)?if\(\2\.name\)\1\[\2\.name\]=\2\.value\|\|""[;}]return \1\.CLAUDE_CODE_ENTRYPOINT=/;
 
 const IDE_NEEDLE_REGEX =
   /let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\.join\(([A-Za-z_$][\w$]*)\.homedir\(\),"\.claude","ide"\);return/;

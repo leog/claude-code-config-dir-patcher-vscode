@@ -2,6 +2,16 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.14
+
+- Fix "Could not find the claudeCode.environmentVariables launch-env patch
+  point" on Claude Code 2.1.275 and newer
+  ([#6](https://github.com/leog/claude-code-config-dir-patcher-vscode/issues/6)).
+  Upstream reshaped the launch-env loop: its body is now wrapped in braces and
+  skips a `CLAUDE_CONFIG_DIR` entry whose value is empty. The ENV needle and
+  patched-form regexes now accept both the old and the new shape, so the patch
+  applies and verifies again on 2.1.275+ while still matching older builds.
+
 ## 0.1.13
 
 - Add a one-time, non-modal review prompt. After the extension has been
