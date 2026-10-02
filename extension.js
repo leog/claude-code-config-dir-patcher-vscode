@@ -688,11 +688,13 @@ function verifyPatch() {
 function restoreBackup() {
   const filePath = getExtensionJsPath();
   const backupPath = `${filePath}${BACKUP_SUFFIX}`;
+  // No backup just means the patch was never applied to this build (e.g. the
+  // patch point wasn't found) — an expected state, not an error to report.
   if (!fs.existsSync(backupPath)) {
-    throw new Error(`No backup exists at ${backupPath}`);
+    return { filePath, backupPath, restored: false };
   }
   fs.copyFileSync(backupPath, filePath);
-  return { filePath, backupPath };
+  return { filePath, backupPath, restored: true };
 }
 
 async function promptReload(message) {
@@ -745,6 +747,12 @@ async function verifyAndReport() {
 
 async function restoreAndReport() {
   const result = restoreBackup();
+  if (!result.restored) {
+    vscode.window.showWarningMessage(
+      `Nothing to restore: no backup exists at ${result.backupPath}. Claude Code's extension.js has not been patched by this extension.`
+    );
+    return;
+  }
   await promptReload(`Restored Anthropic Claude Code extension.js from backup:\n${result.backupPath}`);
 }
 

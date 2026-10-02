@@ -2,6 +2,19 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.15
+
+- Fix "Could not find the claudeCode.environmentVariables launch-env patch
+  point" on Claude Code 2.1.284 and newer
+  ([#7](https://github.com/leog/claude-code-config-dir-patcher-vscode/issues/7)).
+  Upstream reshaped the launch-env builder again: the loop now skips
+  `CLAUDE_CONFIG_DIR` through a helper and assigns a resolved config dir after
+  the loop, before the `CLAUDE_CODE_ENTRYPOINT` return. The ENV needle and
+  patched-form regexes now accept that shape alongside the two older ones.
+- "Restore Backup" with no backup on disk now shows a "nothing to restore"
+  warning instead of failing with an error (CLAUDE-EXTENSION-J). A missing
+  backup just means the patch was never applied to that Claude Code build.
+
 ## 0.1.14
 
 - Fix "Could not find the claudeCode.environmentVariables launch-env patch
