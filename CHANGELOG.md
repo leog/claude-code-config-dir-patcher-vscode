@@ -2,6 +2,16 @@
 
 All notable changes to this extension are documented here.
 
+## 0.1.16
+
+- Fix "Could not find the claudeCode.environmentVariables launch-env patch
+  point" on Claude Code 2.1.311 and newer
+  ([#8](https://github.com/leog/claude-code-config-dir-patcher-vscode/issues/8)).
+  Upstream now merges a telemetry helper into the launch env on the return
+  statement (`return Object.assign(env,helper()),env.CLAUDE_CODE_ENTRYPOINT=`).
+  The ENV needle and patched-form regexes now accept that prefix alongside the
+  three older shapes.
+
 ## 0.1.15
 
 - Fix "Could not find the claudeCode.environmentVariables launch-env patch
