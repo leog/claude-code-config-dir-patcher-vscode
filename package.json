@@ -1,8 +1,8 @@
 {
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Profiles",
-  "description": "Switch between multiple Claude Code accounts from the status bar — one account per VS Code profile. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR fully isolates auth, chat history, and sessions per profile.",
-  "version": "0.2.0",
+  "description": "Switch between multiple Claude Code accounts from the status bar and see each account's 5-hour and weekly usage limits — one account per VS Code profile. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR fully isolates auth, chat history, and sessions per profile.",
+  "version": "0.3.0",
   "keywords": [
     "claude",
     "claude code",
@@ -18,6 +18,10 @@
     "auth",
     "session",
     "isolation",
+    "usage",
+    "usage limits",
+    "rate limit",
+    "quota",
     "ai"
   ],
   "publisher": "leog",
@@ -67,6 +71,14 @@
           "type": "boolean",
           "default": false,
           "description": "Show a notification when startup auto-patching succeeds or is already applied."
+        },
+        "claudeConfigDirPatcher.usage.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show each profile's 5-hour and weekly usage limits in the status bar and profile switcher. Reads each profile's Claude login (the one Claude Code already stores) and sends it only to `api.anthropic.com`, the same request Claude Code's `/usage` makes. Refreshes every 5 minutes.",
+          "tags": [
+            "usesOnlineServices"
+          ]
         },
         "claudeConfigDirPatcher.analytics.enabled": {
           "type": "boolean",

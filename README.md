@@ -16,6 +16,14 @@ Unlike account switchers that swap `~/.claude` credentials behind Claude Code's 
 
 That's it — this VS Code profile now has its own Claude Code account. Switch any time from the same status bar item or with `Claude Code Profiles: Switch Profile`. To use two accounts at once, open two windows with different VS Code profiles.
 
+## Usage limits
+
+Pick **Show usage limits** in the switcher to see every profile's 5-hour and weekly usage, plan, and reset times — so you know which account still has room before you switch. The status bar shows the active profile's 5-hour usage and turns yellow at 80% and red at 95% of either limit.
+
+![Usage limits for each profile in the switcher and status bar](assets/screenshots/usage.png)
+
+It's off until you turn it on. When enabled, the extension reads each profile's existing Claude login (macOS Keychain or `.credentials.json`) and sends it only to `api.anthropic.com` — the same request Claude Code's `/usage` makes — every 5 minutes. Logins are never refreshed, logged, or included in analytics. Turn it off with `claudeConfigDirPatcher.usage.enabled`.
+
 ## How it works
 
 Claude Code CLI supports `CLAUDE_CONFIG_DIR`, but Anthropic's VS Code extension only applies `claudeCode.environmentVariables` to the Claude processes it spawns, while its own storage helpers (auth, chat history, sessions) read `process.env.CLAUDE_CONFIG_DIR` directly. So VS Code profile settings alone don't fully isolate accounts — the chat panel still reads the default `~/.claude`.

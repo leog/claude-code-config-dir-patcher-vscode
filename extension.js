@@ -2,7 +2,11 @@ const fs = require("fs");
 const crypto = require("crypto");
 const os = require("os");
 const path = require("path");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 const vscode = require("vscode");
+
+const execFileAsync = promisify(execFile);
 const {
   analyze,
   patchEnv,
@@ -171,13 +175,28 @@ async function switchProfile() {
     dirs.unshift(activeDir);
   }
 
+  const usageEnabled = isUsageEnabled();
+  // Shows the cached values instantly; the refresh lands in the status bar and
+  // the next time the switcher opens.
+  void refreshUsage();
+
   const items = [undefined, ...dirs].map((dir) => ({
     label: `$(account) ${getProfileLabel(dir)}`,
     description: `${dir || defaultDir}${dir === activeDir ? " — active" : ""}`,
+    detail: usageEnabled ? describeUsage(getUsage(dir)) || "Checking usage…" : undefined,
     dir,
   }));
   items.push(
     { label: "", kind: vscode.QuickPickItemKind.Separator },
+    ...(usageEnabled
+      ? []
+      : [
+          {
+            label: "$(graph) Show usage limits",
+            description: "5-hour and weekly limits for every profile",
+            action: "usage",
+          },
+        ]),
     {
       label: "$(add) New profile",
       description: "Starts signed out, so you can log in to another account",
@@ -194,6 +213,10 @@ async function switchProfile() {
     placeHolder: "Claude Code account for this VS Code profile",
   });
   if (!pick) {
+    return;
+  }
+  if (pick.action === "usage") {
+    await enableUsage();
     return;
   }
 
@@ -233,8 +256,205 @@ function updateProfileStatusBar() {
     return;
   }
   const dir = getActiveConfigDir();
-  profileStatusBarItem.text = `$(account) Claude: ${getProfileLabel(dir)}`;
-  profileStatusBarItem.tooltip = `Claude Code profile: ${dir || getDefaultConfigDir()}\nClick to switch or create profiles.`;
+  const usage = getUsage(dir);
+  const ok = usage && usage.state === "ok";
+  const fiveHour = ok ? percent(usage.fiveHour) : undefined;
+  const peak = ok ? Math.max(percent(usage.fiveHour) || 0, percent(usage.sevenDay) || 0) : 0;
+
+  profileStatusBarItem.text = `$(account) Claude: ${getProfileLabel(dir)}${
+    fiveHour === undefined ? "" : ` · ${fiveHour}%`
+  }`;
+  profileStatusBarItem.backgroundColor =
+    peak >= 95
+      ? new vscode.ThemeColor("statusBarItem.errorBackground")
+      : peak >= 80
+        ? new vscode.ThemeColor("statusBarItem.warningBackground")
+        : undefined;
+  profileStatusBarItem.tooltip = [
+    `Claude Code profile: ${dir || getDefaultConfigDir()}`,
+    describeUsage(usage),
+    "Click to switch or create profiles.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Usage limits (opt-in via claudeConfigDirPatcher.usage.enabled). Reads each
+// profile's Claude login exactly where Claude Code keeps it and asks
+// api.anthropic.com for its 5-hour / weekly utilization: the same request
+// behind Claude Code's /usage. The token is sent nowhere else and never logged.
+// ---------------------------------------------------------------------------
+
+const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
+const USAGE_REFRESH_MS = 5 * 60 * 1000;
+const usageByDir = new Map();
+let usageRefresh;
+
+function isUsageEnabled() {
+  return getConfig().get("usage.enabled", false);
+}
+
+function usageKey(dir) {
+  return dir && dir !== getDefaultConfigDir() ? dir : "";
+}
+
+function getUsage(dir) {
+  return isUsageEnabled() ? usageByDir.get(usageKey(dir)) : undefined;
+}
+
+// Claude Code names its macOS Keychain item after the config dir: the bare name
+// for the default ~/.claude, plus a sha256 prefix of the dir when
+// CLAUDE_CONFIG_DIR points elsewhere.
+function getKeychainService(dir) {
+  const key = usageKey(dir);
+  return key
+    ? `Claude Code-credentials-${crypto.createHash("sha256").update(key).digest("hex").slice(0, 8)}`
+    : "Claude Code-credentials";
+}
+
+async function readOAuth(dir) {
+  if (process.platform === "darwin") {
+    try {
+      const { stdout } = await execFileAsync(
+        "security",
+        ["find-generic-password", "-a", os.userInfo().username, "-w", "-s", getKeychainService(dir)],
+        { timeout: 5000 }
+      );
+      return JSON.parse(stdout).claudeAiOauth;
+    } catch (_error) {
+      // Not in the Keychain: fall back to the file Claude Code also writes.
+    }
+  }
+  try {
+    const file = path.join(usageKey(dir) || getDefaultConfigDir(), ".credentials.json");
+    return JSON.parse(fs.readFileSync(file, "utf8")).claudeAiOauth;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+async function fetchUsage(dir) {
+  const oauth = await readOAuth(dir);
+  if (!oauth || !oauth.accessToken) {
+    return { state: "signed-out" };
+  }
+  const plan = oauth.subscriptionType;
+  // Never refresh the token here: that would rotate the refresh token Claude
+  // Code holds. An expired token is refreshed the next time Claude Code runs.
+  if (oauth.expiresAt && oauth.expiresAt < Date.now()) {
+    return { state: "expired", plan };
+  }
+  const response = await fetch(USAGE_URL, {
+    headers: {
+      Authorization: `Bearer ${oauth.accessToken}`,
+      "anthropic-beta": "oauth-2025-04-20",
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (response.status === 401) {
+    return { state: "expired", plan };
+  }
+  const body = response.ok ? await response.json() : undefined;
+  if (!body || (!body.five_hour && !body.seven_day)) {
+    return { state: "error", plan };
+  }
+  return { state: "ok", plan, fiveHour: body.five_hour, sevenDay: body.seven_day };
+}
+
+// ponytail: every open window polls on its own timer; share results through
+// globalState if a handful of requests per 5 minutes ever matters.
+function refreshUsage() {
+  if (!isUsageEnabled()) {
+    return Promise.resolve();
+  }
+  if (!usageRefresh) {
+    const dirs = [undefined, ...listProfileDirs()];
+    const active = usageKey(getActiveConfigDir());
+    if (active && !dirs.includes(active)) {
+      dirs.push(active);
+    }
+    usageRefresh = Promise.all(
+      dirs.map(async (dir) => {
+        let result;
+        try {
+          result = await fetchUsage(dir);
+        } catch (_error) {
+          result = { state: "error" };
+        }
+        usageByDir.set(usageKey(dir), result);
+      })
+    ).finally(() => {
+      usageRefresh = undefined;
+      updateProfileStatusBar();
+    });
+  }
+  return usageRefresh;
+}
+
+function percent(window) {
+  return window && typeof window.utilization === "number"
+    ? Math.round(window.utilization)
+    : undefined;
+}
+
+function formatReset(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return date.getTime() - Date.now() < 24 * 60 * 60 * 1000
+    ? time
+    : `${date.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
+function formatWindow(label, window) {
+  const value = percent(window);
+  if (value === undefined) {
+    return undefined;
+  }
+  const reset = window.resets_at ? ` (resets ${formatReset(window.resets_at)})` : "";
+  return `${label} ${value}%${reset}`;
+}
+
+function describeUsage(usage) {
+  if (!usage) {
+    return undefined;
+  }
+  const plan = usage.plan ? `${usage.plan[0].toUpperCase()}${usage.plan.slice(1)} · ` : "";
+  switch (usage.state) {
+    case "ok":
+      return (
+        plan +
+        [formatWindow("5h", usage.fiveHour), formatWindow("week", usage.sevenDay)]
+          .filter(Boolean)
+          .join(" · ")
+      );
+    case "signed-out":
+      return "Not signed in";
+    case "expired":
+      return `${plan}Login expired, open Claude Code in this profile to refresh it`;
+    default:
+      return `${plan}Usage unavailable`;
+  }
+}
+
+async function enableUsage() {
+  const choice = await vscode.window.showInformationMessage(
+    "Show usage limits for each Claude Code profile?",
+    {
+      modal: true,
+      detail:
+        "To show each profile's 5-hour and weekly limits, this extension reads that profile's Claude login (the one Claude Code already stores) and sends it only to api.anthropic.com: the same request Claude Code's /usage makes. It is never sent anywhere else or included in analytics. Turn it off any time in Settings under Claude Code Profiles › Usage.",
+    },
+    "Show usage"
+  );
+  if (choice !== "Show usage") {
+    return;
+  }
+  await getConfig().update("usage.enabled", true, vscode.ConfigurationTarget.Global);
+  await refreshUsage();
 }
 
 function getExtensionEnvironment(context) {
@@ -959,8 +1179,16 @@ function activate(context) {
         syncConfigDirEnv();
         updateProfileStatusBar();
       }
+      if (event.affectsConfiguration("claudeConfigDirPatcher.usage")) {
+        updateProfileStatusBar();
+        void refreshUsage();
+      }
     })
   );
+
+  const usageTimer = setInterval(() => void refreshUsage(), USAGE_REFRESH_MS);
+  context.subscriptions.push({ dispose: () => clearInterval(usageTimer) });
+  void refreshUsage();
 
   profileStatusBarItem = vscode.window.createStatusBarItem(
     "claudeConfigDirPatcher.profile",

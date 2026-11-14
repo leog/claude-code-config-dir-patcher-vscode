@@ -2,6 +2,19 @@
 
 All notable changes to this extension are documented here.
 
+## 0.3.0
+
+- New: usage limits per profile (opt-in). Pick **Show usage limits** in the
+  profile switcher to see every profile's 5-hour and weekly utilization, plan,
+  and reset times. The status bar shows the active profile's 5-hour usage and
+  turns yellow at 80% and red at 95% of either limit. Refreshes every 5
+  minutes.
+- Usage is read the way Claude Code's `/usage` does it: each profile's
+  existing Claude login (macOS Keychain or `.credentials.json`) is sent only to
+  `api.anthropic.com`. Tokens are never refreshed, logged, or included in
+  analytics; an expired login shows as such until Claude Code refreshes it.
+- New setting `claudeConfigDirPatcher.usage.enabled` (default off).
+
 ## 0.2.0
 
 - New: profile switcher. A status bar item shows the active Claude Code
