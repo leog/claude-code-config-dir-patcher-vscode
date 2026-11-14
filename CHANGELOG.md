@@ -2,6 +2,14 @@
 
 All notable changes to this extension are documented here.
 
+## 0.2.1
+
+- New extension icon: two Claude accounts, each inside its own usage gauge,
+  with swap arrows between them, replacing the band-aided Claude logo from
+  the patch-only days. Source is `assets/icon.svg`.
+- README screenshots are served straight from `raw.githubusercontent.com`
+  instead of redirecting through `github.com`.
+
 ## 0.2.0
 
 - New: profile switcher. A status bar item shows the active Claude Code
