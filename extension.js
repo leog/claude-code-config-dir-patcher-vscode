@@ -56,6 +56,187 @@ function syncConfigDirEnv() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Profiles. A "profile" is nothing more than a CLAUDE_CONFIG_DIR value stored
+// per VS Code profile in claudeCode.environmentVariables. The status bar shows
+// the active one and the switcher writes the setting, so users never have to
+// hand-edit settings JSON.
+// ---------------------------------------------------------------------------
+
+let profileStatusBarItem;
+
+function getDefaultConfigDir() {
+  return path.join(os.homedir(), ".claude");
+}
+
+function getActiveConfigDir() {
+  const entries = vscode.workspace
+    .getConfiguration("claudeCode")
+    .get("environmentVariables");
+  if (!Array.isArray(entries)) {
+    return undefined;
+  }
+  const entry = entries.find(
+    (item) => item && item.name === "CLAUDE_CONFIG_DIR" && item.value
+  );
+  return entry ? String(entry.value) : undefined;
+}
+
+function getProfileLabel(dir) {
+  if (!dir || dir === getDefaultConfigDir()) {
+    return "default";
+  }
+  return path.basename(dir).replace(/^\.claude-/, "");
+}
+
+function listProfileDirs() {
+  let names;
+  try {
+    names = fs.readdirSync(os.homedir());
+  } catch (_error) {
+    return [];
+  }
+  return names
+    .filter((name) => name.startsWith(".claude-"))
+    .map((name) => path.join(os.homedir(), name))
+    .filter((dir) => {
+      try {
+        return fs.statSync(dir).isDirectory();
+      } catch (_error) {
+        return false;
+      }
+    })
+    .sort();
+}
+
+async function setActiveConfigDir(dir) {
+  const config = vscode.workspace.getConfiguration("claudeCode");
+  // Base the write on the user/profile-level value, not the merged effective
+  // one, so workspace-level entries never get copied into user settings.
+  const inspected = config.inspect("environmentVariables");
+  const current = inspected ? inspected.globalValue : undefined;
+  const entries = (Array.isArray(current) ? current : []).filter(
+    (item) => !(item && item.name === "CLAUDE_CONFIG_DIR")
+  );
+  if (dir) {
+    entries.push({ name: "CLAUDE_CONFIG_DIR", value: dir });
+  }
+  await config.update(
+    "environmentVariables",
+    entries.length ? entries : undefined,
+    vscode.ConfigurationTarget.Global
+  );
+  // syncConfigDirEnv only ever sets the var, so clear it here when switching
+  // back to the default profile; otherwise extension-side storage reads keep
+  // resolving to the previously selected dir until the window reloads.
+  if (!dir) {
+    delete process.env.CLAUDE_CONFIG_DIR;
+  }
+}
+
+// ponytail: capture copies on-disk credential/settings files only. Logins kept
+// in the OS keychain (macOS) can't be copied; the new profile asks to sign in once.
+function captureLoginFiles(fromDir, toDir) {
+  for (const name of [".credentials.json", "settings.json"]) {
+    const source = path.join(fromDir, name);
+    if (fs.existsSync(source)) {
+      fs.copyFileSync(source, path.join(toDir, name));
+    }
+  }
+  return fs.existsSync(path.join(toDir, ".credentials.json"));
+}
+
+function promptProfileName() {
+  return vscode.window.showInputBox({
+    prompt: "Profile name — its account files will live in ~/.claude-<name>",
+    placeHolder: "work",
+    validateInput: (value) => {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
+        return "Use letters, numbers, dots, dashes, or underscores.";
+      }
+      if (fs.existsSync(path.join(os.homedir(), `.claude-${value}`))) {
+        return `~/.claude-${value} already exists — pick it from the switcher instead.`;
+      }
+      return undefined;
+    },
+  });
+}
+
+async function switchProfile() {
+  const defaultDir = getDefaultConfigDir();
+  const configured = getActiveConfigDir();
+  const activeDir = configured === defaultDir ? undefined : configured;
+  const dirs = listProfileDirs();
+  if (activeDir && !dirs.includes(activeDir)) {
+    dirs.unshift(activeDir);
+  }
+
+  const items = [undefined, ...dirs].map((dir) => ({
+    label: `$(account) ${getProfileLabel(dir)}`,
+    description: `${dir || defaultDir}${dir === activeDir ? " — active" : ""}`,
+    dir,
+  }));
+  items.push(
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
+    {
+      label: "$(add) New profile",
+      description: "Starts signed out, so you can log in to another account",
+      action: "create",
+    },
+    {
+      label: "$(files) New profile from current login",
+      description: "Copies the active profile's settings and on-disk login",
+      action: "capture",
+    }
+  );
+
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: "Claude Code account for this VS Code profile",
+  });
+  if (!pick) {
+    return;
+  }
+
+  let dir = pick.dir;
+  let action = "switch";
+  if (pick.action) {
+    const name = await promptProfileName();
+    if (!name) {
+      return;
+    }
+    dir = path.join(os.homedir(), `.claude-${name}`);
+    fs.mkdirSync(dir, { recursive: true });
+    action = pick.action;
+    if (pick.action === "capture") {
+      if (!captureLoginFiles(activeDir || defaultDir, dir)) {
+        vscode.window.showInformationMessage(
+          "Settings copied. Your login is kept in the OS keychain and can't be copied, so the new profile will ask you to sign in once."
+        );
+      }
+    }
+  } else if (dir === activeDir) {
+    return;
+  }
+
+  await setActiveConfigDir(dir);
+  updateProfileStatusBar();
+  captureAnalyticsEvent("profile.switched", {
+    tags: { profile_action: action },
+  });
+  await promptReload(
+    `Claude Code profile is now "${getProfileLabel(dir)}". Reload VS Code so Claude Code picks it up.`
+  );
+}
+
+function updateProfileStatusBar() {
+  if (!profileStatusBarItem) {
+    return;
+  }
+  const dir = getActiveConfigDir();
+  profileStatusBarItem.text = `$(account) Claude: ${getProfileLabel(dir)}`;
+  profileStatusBarItem.tooltip = `Claude Code profile: ${dir || getDefaultConfigDir()}\nClick to switch or create profiles.`;
+}
+
 function getExtensionEnvironment(context) {
   if (context.extensionMode === vscode.ExtensionMode.Development) {
     return "development";
@@ -776,9 +957,21 @@ function activate(context) {
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("claudeCode.environmentVariables")) {
         syncConfigDirEnv();
+        updateProfileStatusBar();
       }
     })
   );
+
+  profileStatusBarItem = vscode.window.createStatusBarItem(
+    "claudeConfigDirPatcher.profile",
+    vscode.StatusBarAlignment.Right,
+    100
+  );
+  profileStatusBarItem.name = "Claude Code Profile";
+  profileStatusBarItem.command = "claudeConfigDirPatcher.switchProfile";
+  updateProfileStatusBar();
+  profileStatusBarItem.show();
+  context.subscriptions.push(profileStatusBarItem);
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -792,6 +985,10 @@ function activate(context) {
     vscode.commands.registerCommand(
       "claudeConfigDirPatcher.restore",
       withErrorAnalytics("command.restore", restoreAndReport)
+    ),
+    vscode.commands.registerCommand(
+      "claudeConfigDirPatcher.switchProfile",
+      withErrorAnalytics("command.switchProfile", switchProfile)
     )
   );
 

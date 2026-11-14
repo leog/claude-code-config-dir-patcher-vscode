@@ -12,3 +12,4 @@ scripts/**
 extension.js
 patch-regexes.js
 package-lock.json
+assets/screenshots/**

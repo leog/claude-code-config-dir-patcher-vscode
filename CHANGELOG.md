@@ -2,6 +2,23 @@
 
 All notable changes to this extension are documented here.
 
+## 0.2.0
+
+- New: profile switcher. A status bar item shows the active Claude Code
+  profile; clicking it (or running `Claude Code Profiles: Switch Profile`)
+  lists profiles found under `~/.claude-*`, lets you switch, create a new
+  profile, or create one from the current login (copies `settings.json` and,
+  when stored on disk, `.credentials.json`; Keychain logins sign in once).
+  The switcher writes `claudeCode.environmentVariables` into the current VS
+  Code profile's settings — no more hand-editing JSON.
+- README now leads with a quick start and screenshots.
+- Switching back to the default profile now also clears
+  `CLAUDE_CONFIG_DIR` from the extension host environment instead of leaving
+  the previous profile's value until reload.
+- New analytics event `profile.switched` records that a switch/create/capture
+  happened (action kind only — never profile names or paths; documented in
+  `telemetry.json`, same opt-outs as all other analytics).
+
 ## 0.1.16
 
 - Fix "Could not find the claudeCode.environmentVariables launch-env patch

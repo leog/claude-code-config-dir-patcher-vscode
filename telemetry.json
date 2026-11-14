@@ -93,6 +93,64 @@
       "endPoint": "Sentry"
     }
   },
+  "claudeConfigDirPatcher.profileSwitched": {
+    "owner": "leog",
+    "comment": "Sent when the user switches, creates, or captures a profile via the switcher, when VS Code telemetry is enabled and this extension's analytics setting is enabled. Profile names and directory paths are never sent.",
+    "analytics_event": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The Sentry event name, profile.switched.",
+      "endPoint": "Sentry"
+    },
+    "profile_action": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Which switcher action ran: switch, create, or capture. No profile name or path is included.",
+      "endPoint": "Sentry"
+    },
+    "user": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "An anonymous per-installation id used to count unique users: a SHA-256 hash of VS Code's random telemetry id (vscode.env.machineId) prefixed with this extension's name. Contains no account, hardware, or personal information and cannot be correlated with other products' telemetry.",
+      "endPoint": "Sentry"
+    },
+    "extension_name": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The extension package name.",
+      "endPoint": "Sentry"
+    },
+    "release": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The extension package name and version.",
+      "endPoint": "Sentry"
+    },
+    "environment": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Whether the extension is running in production, development, or test mode.",
+      "endPoint": "Sentry"
+    },
+    "vscode_ui_kind": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Whether VS Code is running on desktop or web.",
+      "endPoint": "Sentry"
+    },
+    "vscode_remote_name": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "The VS Code remote kind, or none when not connected to a remote extension host.",
+      "endPoint": "Sentry"
+    },
+    "runtime": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "VS Code and Node.js version metadata.",
+      "endPoint": "Sentry"
+    }
+  },
   "claudeConfigDirPatcher.extensionInstalled": {
     "owner": "leog",
     "comment": "Sent once on first activation when VS Code telemetry is enabled and this extension's analytics setting is enabled. This is a proxy for successful installation because VS Code extensions cannot observe marketplace install completion directly.",
