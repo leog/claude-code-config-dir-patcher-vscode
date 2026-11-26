@@ -2,7 +2,7 @@
   "name": "claude-code-config-dir-patcher",
   "displayName": "Claude Code Profiles",
   "description": "Switch between multiple Claude Code accounts from the status bar and see each account's 5-hour and weekly usage limits — one account per VS Code profile. Patches Anthropic's Claude Code extension so CLAUDE_CONFIG_DIR fully isolates auth, chat history, and sessions per profile.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "keywords": [
     "claude",
     "claude code",
