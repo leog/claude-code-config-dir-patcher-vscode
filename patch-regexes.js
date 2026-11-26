@@ -4,20 +4,27 @@
 //
 // Capture groups for ENV_NEEDLE_REGEX: 1=loop var, 2=collection var, 3=env-object var.
 //
-// The launch-env loop has four known minified shapes:
+// The launch-env loop has five known minified shapes:
 //   <= 2.1.274  for(let a of b)if(a.name)c[a.name]=a.value||"";return c.CLAUDE_CODE_ENTRYPOINT=
 //   >= 2.1.275  for(let a of b){if(a.name==="CLAUDE_CONFIG_DIR"&&a.value==="")continue;if(a.name)c[a.name]=a.value||""}return c.CLAUDE_CODE_ENTRYPOINT=
 //   >= 2.1.284  for(let a of b){if(f(a.name))continue;if(a.name)c[a.name]=a.value||""}let d=g(b,Boolean(h("claudeProcessWrapper")));if(d!==void 0)c.CLAUDE_CONFIG_DIR=d;return c.CLAUDE_CODE_ENTRYPOINT=
 //   >= 2.1.311  ...same, but the return opens with Object.assign(c,i()),c.CLAUDE_CODE_ENTRYPOINT=
+//   >= 2.1.332  Object.assign(c,i()) becomes its own statement, followed by a
+//               Bun crash-reporting guard, then a plain return:
+//               ...c.CLAUDE_CONFIG_DIR=d;Object.assign(c,i());let e=Object.keys(c).filter(k);
+//               if(!e.some((s)=>c[s])){for(let s of e)if(s.toUpperCase()==="BUN_ENABLE_CRASH_REPORTING")delete c[s];
+//               c.BUN_ENABLE_CRASH_REPORTING="0"}return c.CLAUDE_CODE_ENTRYPOINT=
 // Both regexes accept any of them (optional brace, optional CLAUDE_CONFIG_DIR
 // skip in either form, optional resolved-config-dir assignment after the loop,
-// optional Object.assign(env,helper()) prefix on the return).
+// optional Object.assign(env,helper()) statement and Bun crash-reporting guard
+// before the return, optional Object.assign(env,helper()) prefix on the return).
+// Groups 5-7 belong to the Bun guard and are only back-referenced inside it.
 
 const ENV_NEEDLE_REGEX =
-  /for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)\{?(?:if\((?:\1\.name==="CLAUDE_CONFIG_DIR"&&\1\.value===""|[A-Za-z_$][\w$]*\(\1\.name\))\)continue;)?if\(\1\.name\)([A-Za-z_$][\w$]*)\[\1\.name\]=\1\.value\|\|""[;}](?:let ([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\2,Boolean\([A-Za-z_$][\w$]*\("claudeProcessWrapper"\)\)\);if\(\4!==void 0\)\3\.CLAUDE_CONFIG_DIR=\4;)?return (?:Object\.assign\(\3,[A-Za-z_$][\w$]*\(\)\),)?\3\.CLAUDE_CODE_ENTRYPOINT=/;
+  /for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)\{?(?:if\((?:\1\.name==="CLAUDE_CONFIG_DIR"&&\1\.value===""|[A-Za-z_$][\w$]*\(\1\.name\))\)continue;)?if\(\1\.name\)([A-Za-z_$][\w$]*)\[\1\.name\]=\1\.value\|\|""[;}](?:let ([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\2,Boolean\([A-Za-z_$][\w$]*\("claudeProcessWrapper"\)\)\);if\(\4!==void 0\)\3\.CLAUDE_CONFIG_DIR=\4;)?(?:Object\.assign\(\3,[A-Za-z_$][\w$]*\(\)\);)?(?:let ([A-Za-z_$][\w$]*)=Object\.keys\(\3\)\.filter\([A-Za-z_$][\w$]*\);if\(!\5\.some\(\(([A-Za-z_$][\w$]*)\)=>\3\[\6\]\)\)\{for\(let ([A-Za-z_$][\w$]*) of \5\)if\(\7\.toUpperCase\(\)==="BUN_ENABLE_CRASH_REPORTING"\)delete \3\[\7\];\3\.BUN_ENABLE_CRASH_REPORTING="0"\})?return (?:Object\.assign\(\3,[A-Za-z_$][\w$]*\(\)\),)?\3\.CLAUDE_CODE_ENTRYPOINT=/;
 
 const ENV_PATCHED_REGEX =
-  /if\(([A-Za-z_$][\w$]*)\.CLAUDE_CONFIG_DIR\)process\.env\.CLAUDE_CONFIG_DIR=\1\.CLAUDE_CONFIG_DIR;for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)\{?(?:if\((?:\2\.name==="CLAUDE_CONFIG_DIR"&&\2\.value===""|[A-Za-z_$][\w$]*\(\2\.name\))\)continue;)?if\(\2\.name\)\1\[\2\.name\]=\2\.value\|\|""[;}](?:let ([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\3,Boolean\([A-Za-z_$][\w$]*\("claudeProcessWrapper"\)\)\);if\(\4!==void 0\)\1\.CLAUDE_CONFIG_DIR=\4;)?return (?:Object\.assign\(\1,[A-Za-z_$][\w$]*\(\)\),)?\1\.CLAUDE_CODE_ENTRYPOINT=/;
+  /if\(([A-Za-z_$][\w$]*)\.CLAUDE_CONFIG_DIR\)process\.env\.CLAUDE_CONFIG_DIR=\1\.CLAUDE_CONFIG_DIR;for\(let ([A-Za-z_$][\w$]*) of ([A-Za-z_$][\w$]*)\)\{?(?:if\((?:\2\.name==="CLAUDE_CONFIG_DIR"&&\2\.value===""|[A-Za-z_$][\w$]*\(\2\.name\))\)continue;)?if\(\2\.name\)\1\[\2\.name\]=\2\.value\|\|""[;}](?:let ([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\3,Boolean\([A-Za-z_$][\w$]*\("claudeProcessWrapper"\)\)\);if\(\4!==void 0\)\1\.CLAUDE_CONFIG_DIR=\4;)?(?:Object\.assign\(\1,[A-Za-z_$][\w$]*\(\)\);)?(?:let ([A-Za-z_$][\w$]*)=Object\.keys\(\1\)\.filter\([A-Za-z_$][\w$]*\);if\(!\5\.some\(\(([A-Za-z_$][\w$]*)\)=>\1\[\6\]\)\)\{for\(let ([A-Za-z_$][\w$]*) of \5\)if\(\7\.toUpperCase\(\)==="BUN_ENABLE_CRASH_REPORTING"\)delete \1\[\7\];\1\.BUN_ENABLE_CRASH_REPORTING="0"\})?return (?:Object\.assign\(\1,[A-Za-z_$][\w$]*\(\)\),)?\1\.CLAUDE_CODE_ENTRYPOINT=/;
 
 const IDE_NEEDLE_REGEX =
   /let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\.join\(([A-Za-z_$][\w$]*)\.homedir\(\),"\.claude","ide"\);return/;

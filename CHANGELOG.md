@@ -2,6 +2,13 @@
 
 All notable changes to this extension are documented here.
 
+## 0.3.1
+
+- Fix: match the launch-env builder on Claude Code 2.1.332+. Upstream moved
+  `Object.assign(env,helper())` into its own statement and added a Bun
+  crash-reporting guard before the return, so the patch point was reported
+  missing. Verified against 2.1.330, 2.1.331 and 2.1.332.
+
 ## 0.3.0
 
 - New: usage limits per profile (opt-in). Pick **Show usage limits** in the
